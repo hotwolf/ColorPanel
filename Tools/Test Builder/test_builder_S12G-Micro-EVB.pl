@@ -1,0 +1,1 @@
+../../Subprojects/S12CForth/Subprojects/S12CBase/Tools/Test Builder/test_builder_S12G-Micro-EVB.pl
