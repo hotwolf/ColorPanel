@@ -1,0 +1,6 @@
+---
+layout: post
+title: ColorPanel Project Started
+---
+
+ColorPanel is a new project that I intend to build over the next months. The hardware is simple. It's an 50cmx50cm picture frame, lit up by WS2812b LED strips. The LEDs are controlled by a <a href="http://hotwolf.github.com/S12G-Micro-EVB">S12G-Micro-EVB</a> board, running <a href="http://hotwolf.github.com/S12CForth">S12CForth</a>.
