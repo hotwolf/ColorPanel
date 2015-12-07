@@ -1,3 +1,36 @@
 ColorPanel
 ==========
-A decorative mood light
+A decorative mood light.
+
+This design is based on the S12G Micro EVB (https://github.com/hotwolf/S12G-Micro-EVB).
+
+Directories:
+============
+|
++-Hardware              - Hardware related information
+|
++-Software              - Source code (ASM and Forth)
+|
++-Preview               - Processing sketches to try out display patterns
+|
++-Tools                 - Development tools
+|
++-Subprojects           - Repository clones of the projects that the ColorPanel
+                          is based on
+
+The ColorPanel software is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with the ColorPanel software. If not, see <http://www.gnu.org/licenses/>.
+
+The hardware design of the ColorPanel project is licensed under a Creative
+Commons Attribution-ShareAlike 3.0 Unported License
+(http://creativecommons.org/licenses/by-sa/3.0/).
+
+The hardware design of the ColorPanel project is licensed under a Creative
+Commons Attribution-ShareAlike 3.0 Unported License
+(http://creativecommons.org/licenses/by-sa/3.0/).
+

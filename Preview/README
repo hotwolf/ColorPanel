@@ -1,0 +1,25 @@
+ColorPanel
+==========
+A decorative mood light.
+
+This directory contains Processing sketches to try ou display patterns.
+
+Directories:
+============
+|
++-ColorDiaplay_Squares  - An early display simulation using square pixels.
+|
++-ColorDiaplay_Dots     - A first display simulation using uverlapping dots.
+
+The ColorPanel software is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with the ColorPanel software. If not, see <http://www.gnu.org/licenses/>.
+
+The hardware design of the ColorPanel project is licensed under a Creative
+Commons Attribution-ShareAlike 3.0 Unported License
+(http://creativecommons.org/licenses/by-sa/3.0/).
+
