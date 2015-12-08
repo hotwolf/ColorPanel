@@ -9,7 +9,7 @@ Directories:
 |
 +-ColorDiaplay_Squares  - An early display simulation using square pixels.
 |
-+-ColorDiaplay_Dots     - A first display simulation using uverlapping dots.
++-ColorDiaplay_Dots     - An early first display simulation using uverlapping dots.
 
 The ColorPanel software is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
