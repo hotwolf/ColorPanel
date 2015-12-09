@@ -52,8 +52,29 @@
 ;#                                                                             #
 ;###############################################################################
 
-;#LED Buffer (single color):
-; 
+;#Pixel buffer (RGB):
+;
+;     +--------------+ +0
+;     |              |
+;     |    CPAGE     |
+;     |    green     |
+;     |              |
+;     |              |
+;     +--------------+ +PANEL_CPAGE_SIZE
+;     |              |
+;     |    CPAGE     |
+;     |     red      |
+;     |              |
+;     |              |
+;     +--------------+ +2*PANEL_CPAGE_SIZE
+;     |              |
+;     |    CPAGE     |
+;     |    blue      |
+;     |              |
+;     |              |
+;     +--------------+
+;
+;#Color page:
 ;        C0  C1  C2  C3  C4  C5  C6  C7  C8  C9  C10 C11 C12 C13  C14
 ;      +----+---+---+---+---+---+---+---+---+---+---+---+---+----+----+
 ;  R0  |A104|A75<A74|A45<A44|A15<A14|B14>B15|B44>B45|B74>B75|B104>B105| +$00
@@ -87,14 +108,9 @@
 ;  R14 |A90 <A89<A60<A59|A30<A29|A0 |B0 |B29>B30|B59>B60|B89>B90 |B119| +$E1  
 ;      +----+---+---+---+---+---+---+---+---+---+---+---+---+----+----+ 
 ;                                 ^   ^
-;                              DO_A   DO_B
-;                             (SPI0) (SPI1)
-
-
-
-
-
-
+;                           STRIP_A   STRIP_B
+;                            (SPI0)   (SPI1)
+;
 	
 ;###############################################################################
 ;# Configuration                                                               #
@@ -104,34 +120,54 @@
 CLOCK_BUS_FREQ		EQU	25000000	;default is 25 MHz
 #endif
 
-;#Baud rate
-#ifndef PANEL_BAUD
-PANEL_BAUD		EQU	12000000	;default is 12 Mbit/s
+;#SPI transmit buffer sizes		
+#ifndef	SCI_TXBUF_SIZE	
+SCI_TXBUF_SIZE		EQU	2*8		;size of each transmit buffer
 #endif
-
-
+	
 ;###############################################################################
 ;# Constants                                                                   #
 ;###############################################################################
 ;#Dimensions 
-PANEL_WIDTH		EQU	15
+PANEL_WIDTH		EQU	15		
 PANEL_HEIGHT		EQU	15
-
+PANEL_CPAGE_SIZE	EQU	PANEL_WIDTH*PANEL_HEIGHT
+PANEL_PIXBUF_SIZE	EQU	3*PANEL_COLPAG_SIZE
+	
 ;#Baud rate
-PANEL_BAUD		EQU	2400000		;WS2812B requires 2.4 Mbit/s
+PANEL_BAUD		EQU	2500000		;WS2812B requires 2.5 Mbit/s
 
 ;#Baud rate divider
 PANEL_SPPR		EQU	((CLOCK_BUS_FREQ/(2*PANEL_BAUD))-1)&7
 PANEL_SPR		EQU	0	
 
+;#Reset length (number of 16-bit SPI transmissions
+PANEL_RST_LENGTH	EQU	8
+
 ;#SPI configuration
-PANEL_SPICR1_CONFIG	EQU	%10010100 	;only SPE and SPTIE will be modified
+				;+-------------- Rx interrupt enable (Request to diable SPI)
+				;|+------------- SPI enable
+				;||+------------ Tx buffer empty interrupy enable
+				;|||+----------- master mode
+				;||||+---------- clock polarity does not matter
+				;|||||+--------- clock phase does not matter
+				;||||||+-------- no slave select output
+				;|||||||+------- transmit MSB first
+				;||||||||	
+PANEL_SPICR1_CFG	EQU	%00010100 	;only SPIE, SPE and SPTIE will be modified
 				;SSSMCCSL 
 				;PPPSPPSS 
 				;IETTOHOB 
 				;E IRLAEF 
 				;  E    E 
-PANEL_SPICR2_CONFIG	EQU	%01000000
+
+				; +------------- 16-bit transfer width
+				; | +----------- no slave select output
+				; | |+---------- MOSI in bidirectional mode 
+				; | || +-------- no STOP in WAIT mode
+				; | || |+------- bidirectional mode (disables MISO)
+				; | || ||	
+PANEL_SPICR2_CFG	EQU	%01001001
 				; X MB SS
 				; F OI PP
 				; R DD IC
@@ -139,7 +175,10 @@ PANEL_SPICR2_CONFIG	EQU	%01000000
 				;   ER W
 				;   NO A
 				;    E I
-PANEL_SPIBR_CONFIG	EQU	((PANEL_SPPR<<4|(PANEL_SPR)))
+PANEL_SPIBR_CFG		EQU	((PANEL_SPPR<<4)|PANEL_SPR)
+
+PANEL_SPICR1_SPICR2_CFG	EQU	((PANEL_SPICR1_CFG<8)|PANEL_SPICR2_CFG)
+PANEL_SPIBR_SPISR_CFG	EQU(	((PANEL_SPIBR_CFG<8)|SPIF|SPTEF|MODF)
 	
 ;###############################################################################
 ;# Variables                                                                   #
@@ -150,33 +189,40 @@ PANEL_SPIBR_CONFIG	EQU	((PANEL_SPPR<<4|(PANEL_SPR)))
 			ORG 	PANEL_VARS_START
 PANEL_VARS_START_LIN	EQU	@			
 #endif	
+	
+//#Pixel buffer	
+PANEL_PIXBUF		EQU	*
+PANEL_CPAGE_RED		DS	PANEL_CPAGE_SIZE
+PANEL_CPAGE_GREEN	DS	PANEL_CPAGE_SIZE
+PANEL_CPAGE_BLUE	DS	PANEL_CPAGE_SIZE
 
-PANEL_AUTO_LOC1		EQU	* 		;1st auto-place location
+;#SPI0 Transmit buffer
+SPI0_TXBUF		DS	SPI_TXBUF_SIZE
+SPI0_TXBUF_IN		DS	1		;points to the next free space
+SPI0_TXBUF_OUT		DS	1		;points to the oldest entry
 
-;#Pixel buffers  
-
-
-
-
-
-
-	ALIGN	1
-
+;#SPI1 Transmit buffer
+SPI1_TXBUF		DS	SPI_TXBUF_SIZE
+SPI1_TXBUF_IN		DS	1		;points to the next free space
+SPI1_TXBUF_OUT		DS	1		;points to the oldest entry
 
 
 
 
 
-;#Command buffer  
-PANEL_BUF		DS	PANEL_BUF_SIZE
-PANEL_BUF_IN		DS	1		;points to the next free space
-PANEL_BUF_OUT		DS	1		;points to the oldest entry
 
-PANEL_AUTO_LOC2		EQU	*		;2nd auto-place location
 
-;#Status flags
-PANEL_STAT		EQU	((PANEL_AUTO_LOC1&1)*PANEL_AUTO_LOC1)+((~(PANEL_AUTO_LOC1)&1)*PANEL_AUTO_LOC2)
-			UNALIGN	((~PANEL_AUTO_LOC1)&1)
+
+
+
+	
+PANEL_STRIPA_RSTCNT	DS	1
+PANEL_STRIPA_CPAGE_IDX	DS	1
+PABEL_STRIPA_COLOR	DS	1
+PANEL_STRIPA_TXDATA	DS	2		
+PANEL_RST
+	
+//#Strip B
 
 PANEL_VARS_END		EQU	*
 PANEL_VARS_END_LIN	EQU	@
@@ -186,126 +232,52 @@ PANEL_VARS_END_LIN	EQU	@
 ;###############################################################################
 ;#Initialization
 #macro	PANEL_INIT, 0
-			;Deassert display reset 
-			;BSET	PANEL_RESET_PORT, #PANEL_RESET_PIN
-			MOVB	#PANEL_RESET_PIN, PANEL_RESET_PORT ;shortcut
-			;Initialize Variables 
-			MOVW	#$0000, PANEL_BUF_IN
-			CLR	PANEL_STAT
-			;Initialize SPI	
-			MOVW	#((PANEL_SPICR1_CONFIG<<8)|PANEL_SPICR2_CONFIG), SPICR1
-			MOVB	#PANEL_SPIBR_CONFIG, SPIBR
-			;Setup display	
-			LDX	#PANEL_SEQ_INIT_START
-			LDY	#(PANEL_SEQ_INIT_END-PANEL_SEQ_INIT_START)
-			PANEL_STREAM_BL
+			;SPI0 setup 
+			MOVW	#PANEL_SPICR1_SPICR2_CFG, SPI0CR1
+			MOVW	#PANEL_SPIBR_SPISR_CFG,   SPI0BR
+			;SPI1 setup 
+			MOVW	#PANEL_SPICR1_SPICR2_CFG, SPI1CR1
+			MOVW	#PANEL_SPIBR_SPISR_CFG,   SPI1BR
 #emac
 
 ;# Essential functions
 ;---------------------
-;#Determine how much space is left on the buffer
-; args:   none
-; result: B: Space left on the buffer in bytes
-; SSTACK: 3 bytes
-;         X, Y and B are preserved 
-#macro	PANEL_BUF_FREE, 0
-			SSTACK_JOBSR	PANEL_BUF_FREE, 3
-#emac	
 	
-;#Transmit commands and data (non-blocking)
-; args:   B: buffer entry
-; result: C: 1=successful, 0=nothing has been done
-; SSTACK: 5 bytes
-;         X, Y and D are preserved 
-#macro	PANEL_TX_NB, 0
-			SSTACK_JOBSR	PANEL_TX_NB, 5
-#emac
-
-;#Transmit commands and data (blocking)
-; args:   B: buffer entry
-; result: none
-; SSTACK: 7 bytes
-;         X, Y and D are preserved 
-#macro	PANEL_TX_BL, 0
-			SSTACK_JOBSR	PANEL_TX_BL, 7
-#emac
-
-;#Transmit immediate commands and data (blocking)
-; args:   1: buffer entry
-; result: B: buffer entry
-; SSTACK: 7 bytes
-;         X, Y and A are preserved 
-#macro	PANEL_TX_IMM_BL, 1
-			LDAB	#\1
-			SSTACK_JOBSR	PANEL_TX_BL, 7
-#emac
-
-;#Transmit a sequence of commands and data (non-blocking)
-; args:   X: pointer to the start of the sequence
-;         Y: number of bytes to transmit
-; result: X: pointer to the start of the remaining sequence
-;         Y: number of remaining bytes to transmit
-;         C: 1 = successful, 0=buffer full
-; SSTACK: 8 bytes
-;         D is preserved 
-#macro	PANEL_STREAM_NB, 0
-			SSTACK_JOBSR	PANEL_STREAM_NB, 9
-#emac
-
-;#Transmit a sequence of commands and data (non-blocking)
-; args:   X: pointer to the start of the sequence
-;         Y: number of bytes to transmit
-; result: X: points to the byte after the sequence
-;         Y: $0000
-; SSTACK: 10 bytes
-;         D is preserved 
-#macro	PANEL_STREAM_BL, 0
-			SSTACK_JOBSR	PANEL_STREAM_NB, 11
-#emac
-
 ;# Convenience macros
 ;--------------------
-;#Transmit a sequence of commands and data (non-blocking)
-; args:   1: pointer to the start of the sequence
-;         2: pointer past the end of the sequence
-; result: none
-; SSTACK: 10 bytes
-;         D is preserved 
-#macro	PANEL_STREAM_FROM_TO_BL, 2
-			LDX	#\1
-			LDY	#(\2-\1)
-			PANEL_STREAM_BL
-#emac
-
-;#Switch to command input (blocking)
-; args:   none
-; result: none
-; SSTACK: 10 bytes
-;         D is preserved 
-#macro	PANEL_CMD_INPUT_BL, 0
-			PANEL_STREAM_FROM_TO_BL	PANEL_SEQ_CMD_START, PANEL_SEQ_CMD_END
-#emac
-
-;#Switch to data input (blocking)
-; args:   none
-; result: none
-; SSTACK: 10 bytes
-;         D is preserved 
-#macro	PANEL_DATA_INPUT_BL, 0
-			PANEL_STREAM_FROM_TO_BL	PANEL_SEQ_DATA_START, PANEL_SEQ_DATA_END
-#emac
 	
 ;# Macros for internal use
 ;-------------------------
-;#Turn a non-blocking subroutine into a blocking subroutine	
-; args:   1: non-blocking function
-;         2: subroutine stack usage of non-blocking function 
-; SSTACK: stack usage of non-blocking function + 2
-;         rgister output of the non-blocking function is preserved 
-#macro	PANEL_MAKE_BL, 2
-			SCI_MAKE_BL \1 \2
-#emac
 
+;#Check if all pixels have been transmittet
+; args:   none
+; result: A: Space left on the buffer in bytes
+; SSTACK: 3 bytes
+;         X, Y and B are preserved 
+
+
+
+	
+
+;#Determine how much space is left on the buffer
+; args:   none
+; result: A: Space left on the buffer in bytes
+; SSTACK: 3 bytes
+;         X, Y and B are preserved 
+
+
+
+
+
+;#SPI ISRs for transmitting data to the WS2812B LEDs
+;---------------------------------------------------
+#macro PANEL_ISR, 1
+			;Check SPTEF flag
+			BRCLR	\1SR,#SPTEF,PANEL_ISR_		;data register still busy
+			MOVB	#(SPIF|SPTEF|MODF), \1SR	;clear flags
+
+
+	
 ;###############################################################################
 ;# Code                                                                        #
 ;###############################################################################
@@ -356,7 +328,7 @@ PANEL_TX_NB		EQU	*
 			BEQ	PANEL_TX_NB_2 					;buffer is full
 			STAA	PANEL_BUF_IN
 			;Enable SPI transmit interrupt 
-			MOVB	#(SPE|SPTIE|PANEL_SPICR1_CONFIG), SPICR1
+			MOVB	#(SPE|SPTIE|PANEL_SPICR1_CFG), SPICR1
 			;Return positive status
 			SSTACK_PREPULL	5
 			SEC							;return positive status
@@ -416,9 +388,13 @@ PANEL_STREAM_NB_3	LEAX	-1,X 						;restore pointer
 PANEL_STREAM_BL		EQU	*
 			PANEL_MAKE_BL	PANEL_STREAM_NB, 8	
 	
-;#SPI ISR for transmitting data to the ST7565R display controller
-;--------------------------
-PANEL_ISR		EQU	*
+;#SPI ISRs for transmitting data to the WS2812B LEDs
+;---------------------------------------------------
+PANEL_SPI0_ISR		EQU	*
+			;Check SPTEF flag
+			BRCLR	SPISR, 
+
+
 			;Check SPIF flag
 			LDAA	SPISR 						;read the status register
 			BITA	#SPIF 						;check SPIF flag (transmission complete)
@@ -451,9 +427,9 @@ PANEL_ISR_3		INCB							;advance OUT index
 PANEL_ISR_4		ISTACK_RTI
 			;Wait for more TX data
 PANEL_ISR_5		BRSET 	PANEL_STAT, #PANEL_STAT_BUSY, PANEL_ISR_6 		;check for ongoing transmission
-			MOVB	#PANEL_SPICR1_CONFIG, SPICR1 			;disable SPI
+			MOVB	#PANEL_SPICR1_CFG, SPICR1 			;disable SPI
 			JOB	PANEL_ISR_4 					;done
-PANEL_ISR_6		MOVB	#(SPE|PANEL_SPICR1_CONFIG), SPICR1 		;disable transmit buffer empty interrupt
+PANEL_ISR_6		MOVB	#(SPE|PANEL_SPICR1_CFG), SPICR1 		;disable transmit buffer empty interrupt
 			JOB	PANEL_ISR_4 					;done
 			;Repeat transmission (buffer pointer in X, OUT in B, PANEL_STAT_REPEAT in A)
 PANEL_ISR_7		MOVB	B,X, SPIDRL 					;Transmit data
@@ -506,68 +482,6 @@ PANEL_CODE_END_LIN	EQU	@
 			ORG 	PANEL_TABS_START
 #endif	
 
-;#Setup stream
-PANEL_SEQ_INIT_START	DB	$40 				;start display at line 0
-			;DB	$A0				;flip display
-			;DB	$C8				;Normal COM0~COM63
-			DB	$A1				;flip display
-			DB	$C0				;Reverse COM63~COM0
-			DB	$A2				;set bias 1/9 (Duty 1/65) ;
-			DB	$2F 				;enabable booster, regulator and follower
-			DB	$F8				;set booster to 4x
-			DB	$00
-			DB	$27				;set ref value to 6.5
-			DB	$81				;set alpha value to 47
-			DB	$10                             ;V0=alpha*(1-(ref/162)*2.1V =[4V..13.5V]
-			DB	$AC				;no static indicator
-			DB	$00
-			DB	$AF 				;enable display
-PANEL_SEQ_INIT_END	EQU	*
-
-;#Switch to command input
-PANEL_SEQ_CMD_START	DB	PANEL_ESC_START
-			DB	PANEL_ESC_CMD
-PANEL_SEQ_CMD_END	EQU	*
-	
-;#Switch to data input
-PANEL_SEQ_DATA_START	DB	PANEL_ESC_START
-			DB	PANEL_ESC_DATA
-PANEL_SEQ_DATA_END	EQU	*
-
-;;#Clear screen
-;PANEL_SEQ_CLEAR_START	DB  $B0 $10 $00                     	;set page 0
-;			DB  PANEL_ESC_START PANEL_ESC_DATA    	;switch to data input
-;			DB  PANEL_ESC_START $7F $00          	;repeat 128 times
-;			DB  PANEL_ESC_START PANEL_ESC_CMD    	;switch to command input
-;			DB  $B1 $10 $00                     	;set page 1
-;			DB  PANEL_ESC_START PANEL_ESC_DATA    	;switch to data input
-;			DB  PANEL_ESC_START $7F $00          	;repeat 128 times
-;			DB  PANEL_ESC_START PANEL_ESC_CMD    	;switch to command input
-;			DB  $B2 $10 $00                     	;set page 2
-;			DB  PANEL_ESC_START PANEL_ESC_DATA    	;switch to data input
-;			DB  PANEL_ESC_START $7F $00          	;repeat 128 times
-;			DB  PANEL_ESC_START PANEL_ESC_CMD    	;switch to command input
-;			DB  $B3 $10 $00                     	;set page 3
-;			DB  PANEL_ESC_START PANEL_ESC_DATA    	;switch to data input
-;			DB  PANEL_ESC_START $7F $00          	;repeat 128 times
-;			DB  PANEL_ESC_START PANEL_ESC_CMD    	;switch to command input
-;			DB  $B4 $10 $00                     	;set page 4
-;			DB  PANEL_ESC_START PANEL_ESC_DATA    	;switch to data input
-;			DB  PANEL_ESC_START $7F $00          	;repeat 128 times
-;			DB  PANEL_ESC_START PANEL_ESC_CMD    	;switch to command input
-;			DB  $B5 $10 $00                     	;set page 5
-;			DB  PANEL_ESC_START PANEL_ESC_DATA    	;switch to data input
-;			DB  PANEL_ESC_START $7F $00          	;repeat 128 times
-;			DB  PANEL_ESC_START PANEL_ESC_CMD    	;switch to command input
-;			DB  $B6 $10 $00                     	;set page 6
-;			DB  PANEL_ESC_START PANEL_ESC_DATA    	;switch to data input
-;			DB  PANEL_ESC_START $7F $00          	;repeat 128 times
-;			DB  PANEL_ESC_START PANEL_ESC_CMD    	;switch to command input
-;			DB  $B7 $10 $00                     	;set page 7
-;			DB  PANEL_ESC_START PANEL_ESC_DATA    	;switch to data input
-;			DB  PANEL_ESC_START $7F $00          	;repeat 128 times
-;			DB  PANEL_ESC_START PANEL_ESC_CMD    	;switch to command input
-;PANEL_SEQ_CLEAR_END	EQU	*
 	
 PANEL_TABS_END		EQU	*
 PANEL_TABS_END_LIN	EQU	@
