@@ -141,12 +141,12 @@ PANEL_BAUD		EQU	2500000		;WS2812B requires 2.5 Mbit/s
 PANEL_SPPR		EQU	((CLOCK_BUS_FREQ/(2*PANEL_BAUD))-1)&7
 PANEL_SPR		EQU	0	
 
-;#Reset length (number of 16-bit SPI transmissions
+;#Reset length (number of 16-bit SPI transmissions)
 PANEL_RST_LENGTH	EQU	8
 
 ;#SPI configuration
-				;+-------------- Rx interrupt enable (Request to diable SPI)
-				;|+------------- SPI enable
+				;+-------------- Rx interrupt enable (disabled)
+				;|+------------- SPI enable (always on)
 				;||+------------ Tx buffer empty interrupy enable
 				;|||+----------- master mode
 				;||||+---------- clock polarity does not matter
@@ -154,7 +154,7 @@ PANEL_RST_LENGTH	EQU	8
 				;||||||+-------- no slave select output
 				;|||||||+------- transmit MSB first
 				;||||||||	
-PANEL_SPICR1_CFG	EQU	%00010100 	;only SPIE, SPE and SPTIE will be modified
+PANEL_SPICR1_CFG	EQU	%01010100 	;only SPTIE will be modified
 				;SSSMCCSL 
 				;PPPSPPSS 
 				;IETTOHOB 
@@ -260,23 +260,36 @@ PANEL_VARS_END_LIN	EQU	@
 	
 
 ;#Determine how much space is left on the buffer
-; args:   none
+; args:   1: SPI instance
+;         X:  
 ; result: A: Space left on the buffer in bytes
 ; SSTACK: 3 bytes
 ;         X, Y and B are preserved 
 
 
 
-
-
 ;#SPI ISRs for transmitting data to the WS2812B LEDs
 ;---------------------------------------------------
-#macro PANEL_ISR, 1
-			;Check SPTEF flag
-			BRCLR	\1SR,#SPTEF,PANEL_ISR_		;data register still busy
-			MOVB	#(SPIF|SPTEF|MODF), \1SR	;clear flags
-
-
+; args:   1: SPI instance
+#macro PANEL_SPI_ISR, 1
+			;Check if TX data is available
+			LDD	\1_TXBUF_IN 					;IN:OUT -> D
+			CBA							;check if buffer is empty
+			BEQ	PANEL_SPI_ISR_ 					;buffer is empty
+			;Transmit next word (IN:OUT in D)
+			BRCLR	\1SR, #SPTEF, PANEL_SPI_ISR_1 		;SPI still busy
+			LDX	#\1_TXBUF 					;buffer pointer -> X
+			MOVW	B,X, \1DR 					;transmit next word
+			;Update buffer pointer (IN:OUT in D)
+			ADDB	#2 						;increment out pointer 
+			ANDB	#(SPI_TXBUF_SIZE-1)
+			STAB	\1_TXBUF_IN 					;IN:OUT -> D
+			;Done
+PANEL_ISR_1		ISTACK_RTI
+			;Disable interrupts 
+			MOVB	#PANEL_SPICR1_CFG, \1CR1 			;clear SPTIE 
+PANEL_ISR_2		JOB	PANEL_ISR_1
+#emac
 	
 ;###############################################################################
 ;# Code                                                                        #
@@ -286,189 +299,17 @@ PANEL_VARS_END_LIN	EQU	@
 #else
 			ORG 	PANEL_CODE_START
 #endif
-	
-;# Essential functions
-;---------------------
-;#Determine how much space is left on the buffer
-; args:   none
-; result: A: Space left on the buffer in bytes
-; SSTACK: 3 bytes
-;         X, Y and B are preserved 
-PANEL_BUF_FREE		EQU	*
-			;Save registers
-			PSHB							;push accu B onto the SSTACK
-			;Check if the buffer is full
-			LDD	PANEL_BUF_IN 					;IN->A; OUT->B
-			SBA
-			ANDA	#(PANEL_BUF_SIZE-1) 				;buffer usage->A
-			NEGA
-			ADDA	#(PANEL_BUF_SIZE-1)
-			;Restore registers
-			SSTACK_PREPULL	3
-			PULB							;pull accu B from the SSTACK
-			;Done
-			RTS
-	
-;#Transmit commands and data (non-blocking)
-; args:   B: buffer entry
-; result: C: 1 = successful, 0=buffer full
-; SSTACK: 5 bytes
-;         X, Y and D are preserved 
-PANEL_TX_NB		EQU	*
-			;Save registers (buffer entry in B)
-			PSHX							;push index X onto the SSTACK
-			PSHA							;push accu A onto the SSTACK
-			;Store buffer entry (buffer entry in B)
-			LDX	#PANEL_BUF 					;buffer address->X
-			LDAA	PANEL_BUF_IN
-			STAB	A,X		  				;write data into buffer
-			INCA			  				;advance IN index
-			ANDA	#(PANEL_BUF_SIZE-1) 				;buffer usage->A
-			CMPA	PANEL_BUF_OUT 					;check if the buffer is full
-			BEQ	PANEL_TX_NB_2 					;buffer is full
-			STAA	PANEL_BUF_IN
-			;Enable SPI transmit interrupt 
-			MOVB	#(SPE|SPTIE|PANEL_SPICR1_CFG), SPICR1
-			;Return positive status
-			SSTACK_PREPULL	5
-			SEC							;return positive status
-PANEL_TX_NB_1		PULA							;pull accu A from the SSTACK
-			PULX							;pull index B from the SSTACK
-			;Done
-			RTS
-			;Return negative status
-PANEL_TX_NB_2		SSTACK_PREPULL	5
-			CLC							;return negative status
-			JOB	PANEL_TX_NB_1	
 
-;#Transmit commands and data (blocking)
-; args:   B: buffer entry
-; result: none
-; SSTACK: 7 bytes
-;         X, Y and D are preserved 
-PANEL_TX_BL		EQU	*
-			PANEL_MAKE_BL	PANEL_TX_NB, 5	
 
-;#Transmit a sequence of commands and data (non-blocking)
-; args:   X: pointer to the start of the sequence
-;         Y: number of bytes to transmit
-; result: X: pointer to the start of the remaining sequence
-;         Y: number of remaining bytes to transmit
-;         C: 1 = successful, 0=buffer full
-; SSTACK: 8 bytes
-;         D is preserved 
-PANEL_STREAM_NB		EQU	*
-			;Save registers (start pointer in X, byte count in Y)
-			PSHB							;push accu B onto the SSTACK
-			;Transmit next byte (start pointer in X, byte count in Y)
-PANEL_STREAM_NB_1	LDAB	1,X+ 						;get data
-			PANEL_TX_NB 						;transmit data (SSTACK: 5 bytes)
-			BCC	PANEL_STREAM_NB_3				;TX buffer is full
-			DBNE	Y, PANEL_STREAM_NB_1 				;transmit next byte
-			;Successful transmission (new start pointer in X, $0000 in Y)
-			SSTACK_PREPULL	3
-			SEC							;signal success
-PANEL_STREAM_NB_2	PULB							;pull accu B from the SSTACK
-			;Done
-			RTS
-			;TX buffer is full (new start pointer+1 in X, new byte count in Y)
-PANEL_STREAM_NB_3	LEAX	-1,X 						;restore pointer
-			;Unsucessful transmission (new start pointer in X, new byte count in Y)			
-			SSTACK_PREPULL	3
-			CLC							;signal success
-			JOB	PANEL_STREAM_NB_2 				; done
 
-;#Transmit a sequence of commands and data (non-blocking)
-; args:   X: pointer to the start of the sequence
-;         Y: number of bytes to transmit
-; result: X: points to the byte after the sequence
-;         Y: $0000
-; SSTACK: 10 bytes
-;         D is preserved 
-PANEL_STREAM_BL		EQU	*
-			PANEL_MAKE_BL	PANEL_STREAM_NB, 8	
+
+
+
 	
 ;#SPI ISRs for transmitting data to the WS2812B LEDs
 ;---------------------------------------------------
-PANEL_SPI0_ISR		EQU	*
-			;Check SPTEF flag
-			BRCLR	SPISR, 
-
-
-			;Check SPIF flag
-			LDAA	SPISR 						;read the status register
-			BITA	#SPIF 						;check SPIF flag (transmission complete)
-			BEQ	PANEL_ISR_1 					;check SPTEF flag (transmit buffer empty) 
-			TST	SPIDRL			   			;clear SPIF flag
-			BCLR	PANEL_STAT, #PANEL_STAT_BUSY 			;clear busy indicator
-			;Check SPTEF flag (SPISR in A)
-PANEL_ISR_1		BITA	#SPTEF						;check SPTEF flag (transmit buffer empty)
-			BEQ	PANEL_ISR_4					;Spi's transmit buffer is full
-			;Check if TX buffer has data
-			LDD	PANEL_BUF_IN 					;IN->A, OUT->B
-			CBA							;check if buffer is empty
-			BEQ	PANEL_ISR_5 					;TX buffer is empty
-			;Check transmission counter (OUT in B) 
-			LDX	#PANEL_BUF
-			LDAA	PANEL_STAT
- 			ANDA	#PANEL_STAT_REPEAT
-			BNE	PANEL_ISR_7 					;repeat transmission
-			;Check for escape character (buffer pointer in X, OUT in B)
-			LDAA	B,X 						;next char->A
-			CMPA	#PANEL_ESC_START	
-			BEQ	PANEL_ISR_8 					;escape character found
-			;Transmit character (char in A, OUT in B)
-PANEL_ISR_2		STAA	SPIDRL 						;transmit character
-			BSET	PANEL_STAT, #PANEL_STAT_BUSY 			;set busy indicator
-PANEL_ISR_3		INCB							;advance OUT index
-			ANDB	#(PANEL_BUF_SIZE-1)
-			STAB	PANEL_BUF_OUT
-			;Done
-PANEL_ISR_4		ISTACK_RTI
-			;Wait for more TX data
-PANEL_ISR_5		BRSET 	PANEL_STAT, #PANEL_STAT_BUSY, PANEL_ISR_6 		;check for ongoing transmission
-			MOVB	#PANEL_SPICR1_CFG, SPICR1 			;disable SPI
-			JOB	PANEL_ISR_4 					;done
-PANEL_ISR_6		MOVB	#(SPE|PANEL_SPICR1_CFG), SPICR1 		;disable transmit buffer empty interrupt
-			JOB	PANEL_ISR_4 					;done
-			;Repeat transmission (buffer pointer in X, OUT in B, PANEL_STAT_REPEAT in A)
-PANEL_ISR_7		MOVB	B,X, SPIDRL 					;Transmit data
-			DECA	
-			ORAA	#PANEL_STAT_BUSY
-			STAA	PANEL_STAT
-			JOB	PANEL_ISR_4 					;done
-			;Escape character found (buffer pointer in X, OUT in B)
-PANEL_ISR_8		INCB							;skip ESC character 
-			ANDB	#(PANEL_BUF_SIZE-1)
-			CMPB	PANEL_BUF_IN 					;check if ESC command is available
-			BEQ	PANEL_ISR_5 					;ESC sequence is incomplete
-			;Evaluate the escape command (buffer pointer in X, new OUT in B)
-			LDAA	B,X 						;ESC command -> A
-			IBEQ	A, PANEL_ISR_10					;$FF: transmit escape character
-			IBEQ	A, PANEL_ISR_11 					;$FE: switch to command mode
-			IBEQ	A, PANEL_ISR_12					;$FD: switch to data mode
-			;Set TX counter (TX count+3 in A, new OUT in B)
-			;SUBA	#4 						;adjust repeat count
-			SUBA	#3 						;adjust repeat count
-			BRCLR	PANEL_STAT, #PANEL_STAT_BUSY, PANEL_ISR_9		;transmission in progress
-			ORAA	#PANEL_STAT_BUSY
-PANEL_ISR_9		STAA	PANEL_STAT 					;set TX count
-			JOB	PANEL_ISR_3					;remove ESC sequence from TX buffer
-			;Transmit escape character (new OUT in B) 
-PANEL_ISR_10		LDAA	#PANEL_ESC_START
-			JOB	PANEL_ISR_2
-			;Switch to command mode (new OUT in B) 
-PANEL_ISR_11		BRCLR	PANEL_A0_PORT, #PANEL_A0_PIN, PANEL_ISR_3		;already in command mode
-			BRSET	PANEL_STAT, #PANEL_STAT_BUSY, PANEL_ISR_6		;transmission in progress
-			;BCLR	PANEL_A0_PORT, #PANEL_A0_PIN 			;switch to command mode
-			MOVB	#PANEL_RESET_PIN, PANEL_A0_PORT  			; shortcut
-			JOB	PANEL_ISR_3					;escape sequence processed
-			;Switch to data mode (new OUT in B) 
-PANEL_ISR_12		BRSET	PANEL_A0_PORT, #PANEL_A0_PIN, PANEL_ISR_3		;already in data mode
-			BRSET	PANEL_STAT, #PANEL_STAT_BUSY, PANEL_ISR_6		;transmission in progress
-			;BSET	PANEL_A0_PORT, #PANEL_A0_PIN 			;switch to data mode
-			MOVB	#(PANEL_A0_PIN|PANEL_RESET_PIN), PANEL_A0_PORT  	; shortcut
-			JOB	PANEL_ISR_3					;escape sequence processed	
+PANEL_SPI0_ISR		PANEL_SPI_ISR	SPI0
+PANEL_SPI1_ISR		PANEL_SPI_ISR	SPI1
 	
 PANEL_CODE_END		EQU	*	
 PANEL_CODE_END_LIN	EQU	@	
