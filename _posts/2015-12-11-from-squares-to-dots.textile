@@ -1,0 +1,53 @@
+---
+layout: post
+title:  From Squares to Dots
+---
+
+My original plan for this project was to build an animated wall mounted light, which would look like
+this:
+
+p=. !{{ site.url}}/images/ColorPanel_Squares.png!
+
+A 50x50cm<sup>2</sup> panel with 15x15 square pixels which can be lit up in multiple colors. The panel was to
+be build upon an "IKEA RIBBA picture frame":http://www.ikea.com/gb/en/catalog/categories/series/16456
+with a white spray painted glass front that is lit up by WS2812b LED strips.
+
+p=. !{{ site.url}}/images/RIBBA_Frame.jpeg!
+
+To shape the square pixels, I had planed insert a mesh of cardboard dividers into the inner frame of
+the RIBBA. This mesh consists of 14 horizontal dividers (50cm by 2.6cm -> the depth of the RIBBA's
+inner frame), and 14 vertical dividers (50cm by 2cm), which are a little narrower to leave room for
+the LED strips. 
+
+p=. !{{ site.url}}/images/Cardboard_Stripes.jpeg!
+
+The I used a jigsaw to cut notches in into the inner frame and the dividers, to be able to stick all
+pieces together.
+
+p=. !{{ site.url}}/images/Inner_Frame_Assembly.jpeg!
+p=. !{{ site.url}}/images/Inner_Frame_Assembly_Detail.jpeg!
+
+Here I made two mistakes:
+* Instead of marking and cutting out all 196 divider notches individually, I bundled the dividers
+  and cut them with a jigsaw. This approach could work in principle, but in my setup the vibration
+  of the saw and the weight of the clamps made the dividers bend while sawing.
+  This caused the notches to be shifted between the various layers of the divider stack.
+* The LED strips fit exactly the width of the picture frame (50cm).
+  I didn't want to cut off the end contacts of the LED strips, so I cut the inner frame a little
+  narrower at the top and bottom side. This is not a good idea, since this weakens the inner frame.
+  My inner frame broke apart. It is much better to cut the LED strips a little shorter to make them
+  fit inside the inner frame. The end contacts of the LED strips are not important. Wires the data
+  signals can be also accessed at the pads of the LEDs
+
+p=. !{{ site.url}}/images/LED_Strips.jpeg!
+
+The frame didn't turn out well. The pixels are not really square. I'm going to toss it.
+
+p=. !{{ site.url}}/images/Inner_Frame_Complete.jpeg!
+
+I don't want to build another divider frame, so I'm going to see how the project looks without one.
+The LEDs have a viewing angle of 120 degrees and they are 3.3cm apart.
+The distance to the glass front is approx. 2.4cm, so the LEDs should produce overlapping dots of
+4.2cm. So the Color panel might look like this in the end:
+
+p=. !{{ site.url}}/images/ColorPanel_Dots.png!
