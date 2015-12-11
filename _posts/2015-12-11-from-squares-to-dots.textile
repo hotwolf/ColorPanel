@@ -25,6 +25,7 @@ The I used a jigsaw to cut notches in into the inner frame and the dividers, to 
 pieces together.
 
 p=. !{{ site.url}}/images/Inner_Frame_Assembly.jpeg!
+
 p=. !{{ site.url}}/images/Inner_Frame_Assembly_Detail.jpeg!
 
 Here I made two mistakes:
@@ -38,8 +39,6 @@ Here I made two mistakes:
   My inner frame broke apart. It is much better to cut the LED strips a little shorter to make them
   fit inside the inner frame. The end contacts of the LED strips are not important. Wires the data
   signals can be also accessed at the pads of the LEDs
-
-p=. !{{ site.url}}/images/LED_Strips.jpeg!
 
 The frame didn't turn out well. The pixels are not really square. I'm going to toss it.
 
