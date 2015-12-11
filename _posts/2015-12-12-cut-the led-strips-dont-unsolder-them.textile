@@ -1,0 +1,19 @@
+---
+layout: post
+title: Cut the LED Strips, Don't Unsolder Them
+---
+
+All of my WS2812B LED stips came in segments of 50cm which were soldered together.
+
+p=. !{{ site.url}}/images/LED_Strip_Joints.jpeg!
+
+Since this is exactly the length I need, I decided to unsolder them. After struggling with a
+soldering iron for a bit, I started using a hot air gun. This worked fine on one manufacturers
+LED strips. When I switched to the LED strips from another manufacturer, I ended up
+unsoldering LEDs along with the joints.
+
+p=. !{{ site.url}}/images/LED_Strips_Assembled.jpeg!
+
+This is not a problem because I can just solder them back in. But there were tiny 402 size bypass
+caps next to the LEDs which are now lost forever. 
+Next time I will just cut the strips and leave those joints alone. 
