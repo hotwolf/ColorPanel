@@ -60,13 +60,13 @@
 ;     |    green     |
 ;     |              |
 ;     |              |
-;     +--------------+ +PANEL_CPAGE_SIZE
+;     +--------------+ +PANEL_PIXEL_COUNT
 ;     |              |
 ;     |    CPAGE     |
 ;     |     red      |
 ;     |              |
 ;     |              |
-;     +--------------+ +2*PANEL_CPAGE_SIZE
+;     +--------------+ +2*PANEL_PIXEL_COUNT
 ;     |              |
 ;     |    CPAGE     |
 ;     |    blue      |
@@ -108,7 +108,7 @@
 ;  R14 |A90 <A89<A60<A59|A30<A29|A0 |B0 |B29>B30|B59>B60|B89>B90 |B119| +$E1  
 ;      +----+---+---+---+---+---+---+---+---+---+---+---+---+----+----+ 
 ;                                 ^   ^
-;                           STRIP_A   STRIP_B
+;                            STRIPA   STRIPB
 ;                            (SPI0)   (SPI1)
 ;
 	
@@ -120,14 +120,40 @@
 CLOCK_BUS_FREQ		EQU	25000000	;default is 25 MHz
 #endif
 
-;#SPI transmit buffer sizes		
-#ifndef	SCI_TXBUF_SIZE	
-SCI_TXBUF_SIZE		EQU	2*8		;size of each transmit buffer
+;#Dimensions 
+#ifndef PANEL_WIDTH	
+PANEL_WIDTH		EQU	15		
 #endif
-	
+#ifndef PANEL_HEIGHT	
+PANEL_HEIGHT		EQU	15
+#endif
+
+;#Partitioning 
+#ifndef PANEL_STARTCOL_STRIP_A
+PANEL_STARTCOL_STRIP_A	EQU	6
+#endif
+#ifndef PANEL_STARTCOL_STRIP_B
+PANEL_STARTCOL_STRIP_B	EQU	7
+#endif
+
 ;###############################################################################
 ;# Constants                                                                   #
 ;###############################################################################
+;#Number of 8-bit transmissions for the reset pulse
+PANEL_RST_LENGTH	EQU	17 		;must be an odd number
+
+//#Pixel buffer	
+PANEL_PIXEL_COUNT	EQU	PANEL_WIDTH*PANEL_HEIGHT
+
+
+
+	
+
+	
+
+;SPI buffer
+PANEL_SCI_TXBUF_MASK	EQU	PANEL_SPI_TXBUF_SIZE
+
 ;#Dimensions 
 PANEL_WIDTH		EQU	15		
 PANEL_HEIGHT		EQU	15
@@ -141,8 +167,8 @@ PANEL_BAUD		EQU	2500000		;WS2812B requires 2.5 Mbit/s
 PANEL_SPPR		EQU	((CLOCK_BUS_FREQ/(2*PANEL_BAUD))-1)&7
 PANEL_SPR		EQU	0	
 
-;#Reset length (number of 16-bit SPI transmissions)
-PANEL_RST_LENGTH	EQU	8
+;#Reset length (number of 8-bit SPI transmissions) WS2812B requires >50us
+PANEL_RST_LENGTH	EQU	17 		;must be an odd number
 
 ;#SPI configuration
 				;+-------------- Rx interrupt enable (disabled)
@@ -191,39 +217,30 @@ PANEL_VARS_START_LIN	EQU	@
 #endif	
 	
 //#Pixel buffer	
-PANEL_PIXBUF		EQU	*
-PANEL_CPAGE_RED		DS	PANEL_CPAGE_SIZE
-PANEL_CPAGE_GREEN	DS	PANEL_CPAGE_SIZE
-PANEL_CPAGE_BLUE	DS	PANEL_CPAGE_SIZE
+PANEL_PIXBUF_START	EQU	*
+PANEL_PIXBUF_GREEN	DS	PANEL_PIXEL_COUNT
+PANEL_PIXBUF_RED	DS	PANEL_PIXEL_COUNT
+PANEL_PIXBUF_BLUE	DS	PANEL_PIXEL_COUNT
+PANEL_PIXBUF_END	EQU	*
 
-;#SPI0 Transmit buffer
-SPI0_TXBUF		DS	SPI_TXBUF_SIZE
-SPI0_TXBUF_IN		DS	1		;points to the next free space
-SPI0_TXBUF_OUT		DS	1		;points to the oldest entry
-
-;#SPI1 Transmit buffer
-SPI1_TXBUF		DS	SPI_TXBUF_SIZE
-SPI1_TXBUF_IN		DS	1		;points to the next free space
-SPI1_TXBUF_OUT		DS	1		;points to the oldest entry
-
-
-
-
-
-
-
-
-
-
+;#Strip A buffer
+PANEL_AUTO_LOC1		EQU	* 			;1st auto-place location
+			ALIGN	1 			
+PANEL_STRIPA_BUF	DS	4 			;intermediate buffer
+PANEL_STRIPA_BUF_CNT	DS	1 			;byte count in intermediate buffer
+PANEL_STRIPA_VERT_MOVE	DS	1 			;vertical movement (+/- PANEL_WIDTH)
+PANEL_STRIPA_PIXBUF_PTR	DS	2 			;pixel buffer pointer
+PANEL_STRIPA_RST_CNT	EQU	((PANEL_AUTO_LOC1&1)*PANEL_AUTO_LOC1)+((~(PANEL_AUTO_LOC1)&1)*PANEL_AUTO_LOC2)	  	
+				  	
+;#Strip B buffer		  	
+PANEL_STRIPB_BUF	DS	4 			;intermediate buffer
+PANEL_STRIPB_BUF_CNT	DS	1 			;byte count in intermediate buffer
+PANEL_STRIPB_VERT_MOVE	DS	1 			;vertical movement (+/- PANEL_WIDTH)
+PANEL_STRIPB_PIXBUF_PTR	DS	2 			;pixel buffer pointer
+PANEL_STRIPB_RST_CNT	DS	1 			;byte count in intermediate buffer	
+				  			
+PANEL_AUTO_LOC2		EQU	* 			;2nd auto-place location
 	
-PANEL_STRIPA_RSTCNT	DS	1
-PANEL_STRIPA_CPAGE_IDX	DS	1
-PABEL_STRIPA_COLOR	DS	1
-PANEL_STRIPA_TXDATA	DS	2		
-PANEL_RST
-	
-//#Strip B
-
 PANEL_VARS_END		EQU	*
 PANEL_VARS_END_LIN	EQU	@
 	
@@ -249,46 +266,151 @@ PANEL_VARS_END_LIN	EQU	@
 ;# Macros for internal use
 ;-------------------------
 
-;#Check if all pixels have been transmittet
-; args:   none
-; result: A: Space left on the buffer in bytes
-; SSTACK: 3 bytes
-;         X, Y and B are preserved 
+;#Expand byte
+; args:   B: byte value
+;         1: address of 1st expanded byte
+;         2: address of 2nd expanded byte
+;         3: address of 3rd expanded byte
+; result: A: 3rd expanded byte
+; 	  B: zero
+; SSTACK: none
+;         X andY are preserved 
+#macro PANEL_EXPAND_BYTE, 3
+			;1st expanded byte
+			LSLA				;bit 7
+			LSLD				;bit 6
+			LSLA				;bit 5
+			LSLA				;bit 4
+			LSLD				;bit 3
+			LSLA				;bit 2
+			LSLA				;bit 1
+			LSLD				;bit 0
+			ORAA	#$92			;set TxHs
+			STAA	/1			;store 1st expanded byte
+			;2nd expanded byte		
+			LSLA				;bit 7
+			LSLA				;bit 6
+			LSLD				;bit 5
+			LSLA				;bit 4
+			LSLA				;bit 3
+			LSLD				;bit 2
+			LSLA				;bit 1
+			LSLA				;bit 0
+			ORAA	#$49			;set TxHs
+			STAA	/2			;store 1st expanded byte
+			;3rd expanded byte		
+			LSLD				;bit 7
+			LSLA				;bit 6
+			LSLA				;bit 5
+			LSLD				;bit 4
+			LSLA				;bit 3
+			LSLA				;bit 2
+			LSLD				;bit 1
+			LSLA				;bit 0
+			ORAA	#$24			;set TxHs
+			STAA	/3			;store 1st expanded byte
+#emac
 
-
-
-	
-
-;#Determine how much space is left on the buffer
-; args:   1: SPI instance
-;         X:  
-; result: A: Space left on the buffer in bytes
-; SSTACK: 3 bytes
-;         X, Y and B are preserved 
-
-
+;#Switch to next pixel buffer entry (strip A)
+; args:   1: branch address in case there is no next entry
+; result: A: new vertical movement (PANEL_STRIPA_VERT_MOVE)
+; 	  X: new buffer pointer (PANEL_STRIPA_PIXBUF_PTR)
+; SSTACK: none
+;         B and Y are preserved 
+#macro PANEL_STRIPA_NEXT, 3
+			;Check if there is a next pixel buffer entrz 
+			LDX	PANEL_STRIPA_PIXBUF_PTR ;buffer pointer -> X
+			CPX	#PANEL_PIXBUF_START	;check for last pixel
+			BEQ	\1			;no next entry
+			;Switch color (buffer pointer in X)
+			CPX	#PANEL_PIXBUF_BLUE	;check for blue
+			BHS	PANEL_STRIPA_NEXT_1	;back to green
+			LEAX	PANEL_PIXEL_COUNT,X	;switch color
+			JOB	PANEL_STRIPA_NEXT_3	;update pointer
+PANEL_STRIPA_NEXT_1	LEAX	(-2*PANEL_PIXEL_COUNT),X;switch back to green
+			;Switch row (new buffer pointer in X)
+			LDAA	PANEL_STRIPA_VERT_MOVE 	;vertical movement -> A
+			LEAX	A,X			;vertical move			
+			CPX	#PANEL_PIXBUF_GREEN	;check green boundaries
+			BL0	PANEL_STRIPA_NEXT_2	;change vertical direction
+			CPX	#PANEL_PIXBUF_RED	;check green boundaries
+			BLO	PANEL_STRIPA_NEXT_3	;update pointer
+PANEL_STRIPA_NEXT_2	NEGA				;change direction
+			STAA	PANEL_STRIPA_VERT_MOVE 	;update vertical movement
+			LEAX	A,Y			;revert vertical move			
+			;Switch column (new buffer pointer in X)
+			LEAX	-1,X 			;horizontal movement
+PANEL_STRIPA_NEXT_3	STX	PANEL_STRIPA_PIXBUF_PTR ;update buffer pointer
+#emac
+			
+;#Switch to next pixel buffer entry (strip B)
+; args:   1: branch address in case there is no next entry
+; result: A: new vertical movement (PANEL_STRIPB_VERT_MOVE)
+; 	  X: new buffer pointer (PANEL_STRIPB_PIXBUF_PTR)
+; SSTACK: none
+;         B and Y are preserved 
+#macro PANEL_STRIPB_NEXT, 3
+			;Check if there is a next pixel buffer entrz 
+			LDX	PANEL_STRIPB_PIXBUF_PTR ;buffer pointer -> X
+			CPX	#(PANEL_PIXBUF_START+PANEL_WIDTH-1);check for last pixel
+			BEQ	\1			;no next entry
+			;Switch color (buffer pointer in X)
+			CPX	#PANEL_PIXBUF_BLUE	;check for blue
+			BHS	PANEL_STRIPB_NEXT_1	;back to green
+			LEAX	PANEL_PIXEL_COUNT,X	;switch color
+			JOB	PANEL_STRIPB_NEXT_3	;update pointer
+PANEL_STRIPB_NEXT_1	LEAX	(-2*PANEL_PIXEL_COUNT),X;switch back to green
+			;Switch row (new buffer pointer in X)
+			LDAA	PANEL_STRIPB_VERT_MOVE 	;vertical movement -> A
+			LEAX	A,X			;vertical move			
+			CPX	#PANEL_PIXBUF_GREEN	;check green boundaries
+			BL0	PANEL_STRIPB_NEXT_2	;change vertical direction
+			CPX	#PANEL_PIXBUF_RED	;check green boundaries
+			BLO	PANEL_STRIPB_NEXT_3	;update pointer
+PANEL_STRIPB_NEXT_2	NEGA				;change direction
+			STAA	PANEL_STRIPB_VERT_MOVE 	;update vertical movement
+			LEAX	A,Y			;revert vertical move			
+			;Switch column (new buffer pointer in X)
+			LEAX	1,X 			;horizontal movement
+PANEL_STRIPB_NEXT_3	STX	PANEL_STRIPB_PIXBUF_PTR ;update buffer pointer
+#emac
 
 ;#SPI ISRs for transmitting data to the WS2812B LEDs
 ;---------------------------------------------------
-; args:   1: SPI instance
-#macro PANEL_SPI_ISR, 1
+; args:   1: "STRIPA" or "STRIPB"
+;         2: "SPI0" or "SPI1"
+#macro PANEL_ISR, 1
+			;Check if reset pulse is to be driven
+			LDAA	PANEL_\1_RST_CNT 	;reset pilse counter -> A
+			BEQ	PANEL_ISR_ 		;drive pixels			
+			;Drive reset pulse (reset pulse counter in A)
+			BRCLR	\1SR, #SPTEF, PANEL_SPI_ISR_1 			;done
+			MOVW	#0000, \1DR 					;transmit part of reset pulse
+			DBEQ	A, PANEL_SPI_ISR_ 				;prepare first pixel
+			STAA	PANEL_\1_RST_CNT 	;reset pilse counter -> A
+			;Dr
+			ISTACK_RTI
+
+
+	
 			;Check if TX data is available
 			LDD	\1_TXBUF_IN 					;IN:OUT -> D
+			ANDA	$#FE 						;ignore odd buffer entries
 			CBA							;check if buffer is empty
-			BEQ	PANEL_SPI_ISR_ 					;buffer is empty
+			BEQ	PANEL_SPI_ISR_2 					;buffer is empty
 			;Transmit next word (IN:OUT in D)
-			BRCLR	\1SR, #SPTEF, PANEL_SPI_ISR_1 		;SPI still busy
+			BRCLR	\1SR, #SPTEF, PANEL_SPI_ISR_1 			;SPI still busy
 			LDX	#\1_TXBUF 					;buffer pointer -> X
 			MOVW	B,X, \1DR 					;transmit next word
 			;Update buffer pointer (IN:OUT in D)
 			ADDB	#2 						;increment out pointer 
-			ANDB	#(SPI_TXBUF_SIZE-1)
+			ANDB	#SPI_TXBUF_MASK
 			STAB	\1_TXBUF_IN 					;IN:OUT -> D
 			;Done
 PANEL_ISR_1		ISTACK_RTI
 			;Disable interrupts 
-			MOVB	#PANEL_SPICR1_CFG, \1CR1 			;clear SPTIE 
-PANEL_ISR_2		JOB	PANEL_ISR_1
+PANEL_ISR_2		MOVB	#PANEL_SPICR1_CFG, \1CR1 			;clear SPTIE 
+			OB	PANEL_ISR_1
 #emac
 	
 ;###############################################################################
@@ -302,6 +424,72 @@ PANEL_ISR_2		JOB	PANEL_ISR_1
 
 
 
+;#Reset WS2812B communication
+; args:   1: SPI instance
+;         X:  
+; result: A: Space left on the buffer in bytes
+; SSTACK: 3 bytes
+;         X, Y and B are preserved 
+PANEL_RST_BL		EQU	* 	
+			;Save registers
+			PSHX							;save X
+			PSHY							;save Y
+			PSHD							;save D
+			;Allocate reset counters
+			MOVW	#((PANEL_RST_LENGTH<<8)|PANEL_RST_LENGTH), 2,-SP;SPI1:SPI0
+			;Check SPI0 buffer
+PANEL_RST_BL_1		SEI							;make sequence atomic
+			LDD	PANEL_SPI0_IN 					;check SPI1 buffer
+			SBA							;IN-OUT -> A
+			ANDA	#~PANEL_SPI_MASK 				;wrap result
+			COMA							;available space in A
+			BNE	PANEL_RST_BL_					;queue not full
+			;Check SPI1 buffer
+			LDD	PANEL_SPI1_IN 					;check SPI1 buffer
+			SBA							;IN-OUT -> A
+			ANDA	#~PANEL_SPI_MASK 				;wrap result
+			COMA							;available space in A
+			BNE	PANEL_RST_BL_					;queue not full
+			;Wait for any system event
+			ISTACK_WAIT 						;wait for next event
+			JOB	PANEL_RST_BL_1 					;check buffers again
+
+			;Fill SPI0 buffer (available buffer entrirs in A, OUT in B)
+			CLI							;allow interrupts
+
+			LDY	#PANEL_SPI0_TXBUF
+			LEAY	B,Y
+
+
+
+
+
+
+
+
+
+
+
+
+	
+	
+	BITA	#PANEL_SPI_MASK					;check available space		
+			BNE	PANEL_RST_BL_ 					;
+	
+
+			;Fill SPI0 buffer 
+			LDY	
+	
+
+	PSHD							;save D
+			PSHD							;save D
+			
+	
+			;Transmit next byte (start pointer in X, byte count in Y)
+DISP_STREAM_NB_1	LDAB	1,X+ 						;get data
+			DISP_TX_NB 						;transmit data (SSTACK: 5 bytes)
+			BCC	DISP_STREAM_NB_3				;TX buffer is full
+			DBNE	Y, DISP_STREAM_NB_1 				;transmit next byte
 
 
 
@@ -323,6 +511,24 @@ PANEL_CODE_END_LIN	EQU	@
 			ORG 	PANEL_TABS_START
 #endif	
 
+#ifndef PANEL_GAMMA_LUT
+PANEL_GAMMA_LUT		DB	   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+			DB	   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,
+			DB	   1,  1,  1,  1,  1,  1,  1,  1,  1,  2,  2,  2,  2,  2,  2,  2,
+			DB	   2,  3,  3,  3,  3,  3,  3,  3,  4,  4,  4,  4,  4,  5,  5,  5,
+			DB	   5,  6,  6,  6,  6,  7,  7,  7,  7,  8,  8,  8,  9,  9,  9, 10,
+			DB	  10, 10, 11, 11, 11, 12, 12, 13, 13, 13, 14, 14, 15, 15, 16, 16,
+			DB	  17, 17, 18, 18, 19, 19, 20, 20, 21, 21, 22, 22, 23, 24, 24, 25,
+			DB	  25, 26, 27, 27, 28, 29, 29, 30, 31, 32, 32, 33, 34, 35, 35, 36,
+			DB	  37, 38, 39, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 50,
+			DB	  51, 52, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 66, 67, 68,
+			DB	  69, 70, 72, 73, 74, 75, 77, 78, 79, 81, 82, 83, 85, 86, 87, 89,
+			DB	  90, 92, 93, 95, 96, 98, 99,101,102,104,105,107,109,110,112,114,
+			DB	 115,117,119,120,122,124,126,127,129,131,133,135,137,138,140,142,
+			DB	 144,146,148,150,152,154,156,158,160,162,164,167,169,171,173,175,
+			DB	 177,180,182,184,186,189,191,193,196,198,200,203,205,208,210,213,
+			DB	 215,218,220,223,225,228,231,233,236,239,241,244,247,249,252,255
+#endif
 	
 PANEL_TABS_END		EQU	*
 PANEL_TABS_END_LIN	EQU	@
