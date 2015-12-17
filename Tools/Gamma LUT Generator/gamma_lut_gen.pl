@@ -70,10 +70,10 @@ foreach $arg (@ARGV) {
 
     #Args	
     elsif (($arg_type =~ /^G$/i) && ($arg =~ /^\s*(\d+\.?\d*)\s*$/i)) {
-	$factor = float($1);
+	$factor = 1*$1;
     }
 
-    elsif (($arg_type =~ /^O$/i) && ($arg =~ /^\s*(\w+)\s*$/i)) {
+    elsif (($arg_type =~ /^O$/i) && ($arg =~ /^\s*(\S+)\s*$/i)) {
 	$file_name = $1;
     }
 
@@ -130,7 +130,7 @@ if (open (FILEHANDLE, sprintf(">%s", $file_name))) {
     printf FILEHANDLE ";###############################################################################\n";
     printf FILEHANDLE ";# Generated on %3s, %3s %.2d %4d                                               #\n", $days[$wday], $months[$mon], $mday, $year;
     printf FILEHANDLE ";###############################################################################\n";
-    printf FILEHANDLE ";# Gamma correction factor: %4.2f %-30s                #\n", $factor;
+    printf FILEHANDLE ";# Gamma correction factor: %4.1f %-30s                #\n", $factor;
     printf FILEHANDLE ";###############################################################################\n";
     printf FILEHANDLE "\n";
     foreach my $row (0..15) {
