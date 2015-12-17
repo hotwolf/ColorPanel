@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 ###############################################################################
-# ColorPanel - Gamma Correction Look-Up Table Generator for the Panel Driver  #
+# ColorPanel - Rainbow Pattern Generator                                      #
 ###############################################################################
 #    Copyright 2015-2016 Dirk Heisswolf                                       #
 #    This file is part of the ColorPanel project.                             #
@@ -42,9 +42,9 @@ use lib $RealBin;
 # global vars #
 ###############
 $need_help         = 0;
-$arg_type          = "G";
-$factor            = 2.4;
-$file_name         = "panel_gamma.s";
+$arg_type          = "B";
+$brightness        = 0.5;
+$file_name         = "panel_rainbow.s";
 
 ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
 $year += 1900;
@@ -69,8 +69,8 @@ foreach $arg (@ARGV) {
     }
 
     #Args	
-    elsif (($arg_type =~ /^G$/i) && ($arg =~ /^\s*(\d+\.?\d*)\s*$/i)) {
-	$factor = 1*$1;
+    elsif (($arg_type =~ /^B$/i) && ($arg =~ /^\s*(\d+\.?\d*)\s*$/i)) {
+	$brightness = 1*$1;
     }
 
     elsif (($arg_type =~ /^O$/i) && ($arg =~ /^\s*(\S+)\s*$/i)) {
@@ -87,7 +87,7 @@ foreach $arg (@ARGV) {
 # print help text #
 ###################
 if ($need_help) {
-    printf "usage: %s -G gamma -O file name\n", $0;
+    printf "usage: %s -B brightness -O file name\n", $0;
     print  "\n";
     exit;
 }
@@ -101,10 +101,10 @@ if (open (FILEHANDLE, sprintf(">%s", $file_name))) {
     
     #Print header
     #------------ 
-    printf FILEHANDLE "#ifndef PANEL_GAMMA_COMPILE\n"; 
-    printf FILEHANDLE "#define PANEL_GAMMA_COMPILE\n"; 
+    printf FILEHANDLE "#ifndef PANEL_SPLASH_COMPILE\n"; 
+    printf FILEHANDLE "#define PANEL_SPLASH_COMPILE\n"; 
     printf FILEHANDLE ";###############################################################################\n";
-    printf FILEHANDLE ";# ColorPanel - Gamma Correction Look-Up Table for the Panel Driver            #\n";
+    printf FILEHANDLE ";# ColorPanel - Rainbow Pattern for the Panel Driver                           #\n";
     printf FILEHANDLE ";###############################################################################\n";
     printf FILEHANDLE ";#    Copyright 2015-2016 Dirk Heisswolf                                       #\n";
     printf FILEHANDLE ";#    This file is part of the ColorPanel project.                             #\n";
@@ -130,22 +130,63 @@ if (open (FILEHANDLE, sprintf(">%s", $file_name))) {
     printf FILEHANDLE ";###############################################################################\n";
     printf FILEHANDLE ";# Generated on %3s, %3s %.2d %4d                                               #\n", $days[$wday], $months[$mon], $mday, $year;
     printf FILEHANDLE ";###############################################################################\n";
-    printf FILEHANDLE ";# Gamma correction factor: %5.2f                                              #\n", $factor;
+    printf FILEHANDLE ";# Brightness: %5.2f                                                           #\n", $brightness;
     printf FILEHANDLE ";###############################################################################\n";
     printf FILEHANDLE "\n";
     printf FILEHANDLE ";#Gamma correction look-up table:\n";
     printf FILEHANDLE ";--------------------------------\n";
-    print  FILEHANDLE "#macro PANEL_GAMMA_LUT, 0";
-    foreach my $row (0..15) {
-        #Print row header
-	print  FILEHANDLE "\n                DB";	    
-	foreach my $column    (0..15) {
-	    #Print table entry
-	    my $inval  = $column+(16*$row);
-	    my $outval = int(((($inval/255)**$factor)*255)+0.5);
-	    #my $outval = int(((($inval/255)**$factor)*255));
-	    printf FILEHANDLE " \$%.2X", $outval;
-	}                                
+    print  FILEHANDLE "#macro PANEL_SPLASH, 0";
+    foreach my $color ("Green", "Red", "Blue") {
+        #Print color header
+	printf  FILEHANDLE "\n                ;%s:", ($color);	    
+	foreach my $row (0..14) {
+	    my $saturation = $row / 14;
+	    #Print row header
+	    print  FILEHANDLE "\n                DB";	    
+	    foreach my $column    (0..14) {
+		my $hue        = ($column * 360) / 15; ;
+
+		my $hue_i      = int($hue / 60);
+		my $f          = ($hue / 60) - $hue_i;
+		my $p          = $brightness * (1 -  $saturation);
+		my $q          = $brightness * (1 - ($saturation * f));
+		my $t          = $brightness * (1 - ($saturation * (1 - f)));
+		my $pwm_val;
+		#printf FILEHANDLE "\nhue=%4.2f hue_i=%d f=%4.2f p=%4.2f q=%4.2f t=%4.2f ==>", $hue, $hue_i, $f, $p, $q, $t;
+		
+		for ($color) {
+		    /Red/ && do {
+			my $red   = ($hue_i == 0) ? $brightness :
+			            ($hue_i == 1) ? $q          :
+			            ($hue_i == 2) ? $p          :
+			            ($hue_i == 3) ? $p          :
+			            ($hue_i == 4) ? $t          :
+			                            $brightness;
+			$pwm_val  = int((0xff * $red) + 0.5);
+			last;};
+		    /Green/ && do {
+			my $green = ($hue_i == 0) ? $t          :
+			            ($hue_i == 1) ? $brightness :
+	      	                    ($hue_i == 2) ? $brightness :
+	      	                    ($hue_i == 3) ? $q          :
+	      	                    ($hue_i == 4) ? $p          :
+				                    $p;
+			$pwm_val  = int((0xff * $green) + 0.5);
+			last;};
+		    /Blue/ && do {
+			my $blue  = ($hue_i == 0) ? $p          :
+	      	                    ($hue_i == 1) ? $p          :
+	      	                    ($hue_i == 2) ? $t          :
+	      	                    ($hue_i == 3) ? $brightness :
+	      	                    ($hue_i == 4) ? $brightness :
+				                    $q;
+			$pwm_val  = int((0xff * $blue) + 0.5);
+			last;};
+		}
+		printf FILEHANDLE " \$%.2X", $pwm_val;
+	    }
+	    printf FILEHANDLE " ;saturation = %4.2f", $saturation;
+	}
     }
     printf FILEHANDLE "\n#emac\n"; 
     printf FILEHANDLE "#endif\n"; 
