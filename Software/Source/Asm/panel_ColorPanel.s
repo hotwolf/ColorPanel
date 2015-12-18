@@ -198,7 +198,7 @@ PANEL_SPIBR_SPISR_CFG	EQU 	((PANEL_SPIBR_CFG<<8)|SPIF|SPTEF|MODF)
 PANEL_VARS_START_LIN	EQU	@			
 #endif	
 	
-//#Pixel buffer	
+;#Pixel buffer
 PANEL_PIXBUF_START	EQU	*
 PANEL_PIXBUF_GREEN	DS	PANEL_PIXEL_COUNT
 PANEL_PIXBUF_RED	DS	PANEL_PIXEL_COUNT
@@ -304,7 +304,7 @@ DONE			CLI				;enable interrupts
 			LSLA				;bit 1
 			LSLD				;bit 0
 			ORAA	#$92			;set TxHs
-			STAA	/1			;store 1st expanded byte
+			STAA	\1			;store 1st expanded byte
 			;2nd expanded byte		
 			LSLA				;bit 7
 			LSLA				;bit 6
@@ -315,7 +315,7 @@ DONE			CLI				;enable interrupts
 			LSLA				;bit 1
 			LSLA				;bit 0
 			ORAA	#$49			;set TxHs
-			STAA	/2			;store 1st expanded byte
+			STAA	\2			;store 1st expanded byte
 			;3rd expanded byte		
 			LSLD				;bit 7
 			LSLA				;bit 6
@@ -326,7 +326,7 @@ DONE			CLI				;enable interrupts
 			LSLD				;bit 1
 			LSLA				;bit 0
 			ORAA	#$24			;set TxHs
-			STAA	/3			;store 1st expanded byte
+			STAA	\3			;store 1st expanded byte
 #emac
 
 ;#Switch to next pixel buffer entry (strip A)

@@ -1,5 +1,5 @@
 #ifndef	GPIO_COMPILED
-GPIO_COMPILED		EQU	1
+#define	GPIO_COMPILED
 ;###############################################################################
 ;# S12CBase - GPIO - GPIO Handler (ColorPanel)                                 #
 ;###############################################################################
@@ -139,12 +139,7 @@ GPIO_COMPILED		EQU	1
 ;###############################################################################
 ;# Variables                                                                   #
 ;###############################################################################
-#ifdef GPIO_VARS_START_LIN
 			ORG 	GPIO_VARS_START, GPIO_VARS_START_LIN
-#else
-			ORG 	GPIO_VARS_START
-GPIO_VARS_START_LIN	EQU	@			
-#endif	
 
 GPIO_VARS_END		EQU	*
 GPIO_VARS_END_LIN	EQU	@
@@ -208,13 +203,8 @@ GPIO_VARS_END_LIN	EQU	@
 	
 ;###############################################################################
 ;# Code                                                                        #
-;###############################################################################
-#ifdef GPIO_CODE_START_LIN
+;;###############################################################################
 			ORG 	GPIO_CODE_START, GPIO_CODE_START_LIN
-#else
-			ORG 	GPIO_CODE_START
-GPIO_CODE_START_LIN	EQU	@			
-#endif	
 
 GPIO_CODE_END		EQU	*	
 GPIO_CODE_END_LIN	EQU	@	
@@ -222,12 +212,7 @@ GPIO_CODE_END_LIN	EQU	@
 ;###############################################################################
 ;# Tables                                                                      #
 ;###############################################################################
-#ifdef GPIO_TABS_START_LIN
 			ORG 	GPIO_TABS_START, GPIO_TABS_START_LIN
-#else
-			ORG 	GPIO_TABS_START
-GPIO_CODE_START_LIN	EQU	@			
-#endif	
 
 GPIO_TABS_END		EQU	*	
 GPIO_TABS_END_LIN	EQU	@	

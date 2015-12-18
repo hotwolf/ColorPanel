@@ -61,12 +61,7 @@
 ;###############################################################################
 ;# Variables                                                                   #
 ;###############################################################################
-#ifdef VECTAB_VARS_START_LIN
 			ORG 	VECTAB_VARS_START, VECTAB_VARS_START_LIN
-#else
-			ORG 	VECTAB_VARS_START
-VECTAB_VARS_START_LIN	EQU	@			
-#endif	
 
 VECTAB_VARS_END		EQU	*
 VECTAB_VARS_END_LIN	EQU	@
@@ -85,12 +80,7 @@ VECTAB_VARS_END_LIN	EQU	@
 ;###############################################################################
 ;# Code                                                                        #
 ;###############################################################################
-#ifdef VECTAB_CODE_START_LIN
 			ORG 	VECTAB_CODE_START, VECTAB_CODE_START_LIN
-#else
-			ORG 	VECTAB_CODE_START
-VECTAB_CODE_START_LIN	EQU	@			
-#endif	
 
 ;Illegal interrupt catcher
 #ifndef VECTAB_DEBUG
@@ -105,12 +95,7 @@ VECTAB_CODE_END_LIN	EQU	@
 ;###############################################################################
 ;# Tables                                                                      #
 ;###############################################################################
-#ifdef VECTAB_TABS_START_LIN
 			ORG 	VECTAB_TABS_START, VECTAB_TABS_START_LIN
-#else
-			ORG 	VECTAB_TABS_START
-VECTAB_TABS_START_LIN	EQU	@			
-#endif	
 
 ;#Interrupt service routines
 ;#--------------------------
