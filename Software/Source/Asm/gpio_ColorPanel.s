@@ -1,5 +1,5 @@
 #ifndef	GPIO_COMPILED
-#define GPIO_COMPILED
+GPIO_COMPILED		EQU	1
 ;###############################################################################
 ;# S12CBase - GPIO - GPIO Handler (ColorPanel)                                 #
 ;###############################################################################
