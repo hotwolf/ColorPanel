@@ -4,7 +4,7 @@
 ;# S12CBase - VECTAB - Vector Table (ColorPanel)                               #
 ;###############################################################################
 ;###############################################################################
-;#    Copyright 2010-2016 Dirk Heisswolf                                       #
+;#    Copyright 2015-2016 Dirk Heisswolf                                       #
 ;#    This file is part of the ColorPanel project.                             #
 ;#                                                                             #
 ;#    The ColorPanel firmware is free software: you can redistribute it and/or #
@@ -27,19 +27,8 @@
 ;#    handler.                                                                 #
 ;###############################################################################
 ;# Version History:                                                            #
-;#    April 14, 2012                                                           #
-;#      - Initial release                                                      #
-;#    August 10, 2012                                                          #
-;#      - Added support for linear PC                                          #
-;#      - Added dummy vectors                                                  #
-;#    November 16, 2012                                                        #
-;#      - Restructured table                                                   #
-;#    June 12, 2013                                                            #
-;#      - Added ECC error interrupt                                            #
-;#    September 30, 2014                                                       #
-;#      - Added USB supply voltage monitor for RevB boards                     #
-;#    January 29, 2015                                                         #
-;#      - Updated during S12CBASE overhaul                                     #
+;#    December 17, 2015                                                        #
+;#      - Initial release for the ColorPanel project                           #
 ;###############################################################################
 ;# Required Modules:                                                           #
 ;#    RESET   - Reset handler                                                  #
@@ -101,17 +90,13 @@ VECTAB_CODE_END_LIN	EQU	@
 ;#--------------------------
 #ifdef VECTAB_DEBUG
 ISR_SPURIOUS		BGND				;vector base + $80
-ISR_PAD			BGND
-#ifdef	VMON_ISR					;vector base + $84
-ISR_ADCCOMP		EQU	VMON_ISR
-#else
-ISR_ADCCOMP		BGND
-#endif
+ISR_PAD			BGND				;vector base + $82
+ISR_ADCCOMP		EQU	VMON_ISR		;vector base + $84
 ISR_RES86		BGND				;vector base + $86
 ISR_API			BGND				;vector base + $88
 ISR_LVI			BGND				;vector base + $8A
 ISR_RES8C		BGND				;vector base + $8C
-ISR_PORTP		BGND
+ISR_PORTP		BGND				;vector base + $8E
 ISR_RES90		BGND				;vector base + $90
 ISR_RES92		BGND				;vector base + $92
 ISR_RES94		BGND				;vector base + $94
@@ -133,17 +118,9 @@ ISR_CANRX		BGND				;vector base + $B2
 ISR_CANERR		BGND				;vector base + $B4
 ISR_CANWUP		BGND				;vector base + $B6
 ISR_FLASH		BGND				;vector base + $B8
-#ifdef	NVM_ISR_ECCERR					;vector base + $BA
-ISR_FLASHFLT  		EQU	NVM_ISR_ECCERR
-#else
-ISR_FLASHFLT  		BGND
-#endif
+ISR_FLASHFLT  		EQU	NVM_ISR_ECCERR		;vector base + $BA
 ISR_SPI2		BGND				;vector base + $BC
-#ifdef	PANEL_ISR_SPI1					;vector base + $BE
-ISR_SPI1		EQU	PANEL_ISR_SPI1
-#else
-ISR_SPI1		BGND
-#endif
+ISR_SPI1		EQU	PANEL_ISR_SPI1		;vector base + $BE
 ISR_RESC0		BGND				;vector base + $C0
 ISR_SCI2		BGND				;vector base + $C2
 ISR_RESC4		BGND				;vector base + $C4
@@ -155,16 +132,8 @@ ISR_PORTJ		BGND				;vector base + $CC
 ISR_RESD0		BGND				;vector base + $D0
 ISR_ATD0		BGND				;vector base + $D2
 ISR_SCI1		BGND				;vector base + $D4
-#ifdef	SCI_ISR_RXTX					;vector base + $D6
-ISR_SCI0		EQU	SCI_ISR_RXTX
-#else
-ISR_SCI0		BGND
-#endif
-#ifdef	PANEL_ISR_SPI0					;vector base + $D8
-ISR_SPI0		EQU	PANEL_ISR_SPI0
-#else
-ISR_SPI0		BGND
-#endif
+ISR_SCI0		EQU	SCI_ISR_RXTX		;vector base + $D6
+ISR_SPI0		EQU	PANEL_ISR_SPI0		;vector base + $D8
 ISR_TIM_PAIE		BGND				;vector base + $DA
 ISR_TIM_PAOV		BGND				;vector base + $DC
 ISR_TIM_TOV		BGND				;vector base + $DE
@@ -172,22 +141,10 @@ ISR_TIM_TC7		BGND				;vector base + $E0
 ISR_TIM_TC6		BGND				;vector base + $E2
 ISR_TIM_TC5		BGND				;vector base + $E4
 ISR_TIM_TC4		BGND				;vector base + $E6
-#ifdef	SCI_ISR_DELAY					;vector base + $E8
-ISR_TIM_TC3		EQU	SCI_ISR_DELAY
-#else
-ISR_TIM_TC3		BGND
-#endif
+ISR_TIM_TC3		EQU	SCI_ISR_DELAY		;vector base + $E8
 ISR_TIM_TC2		BGND				;vector base + $EA
-#ifdef	SCI_ISR_BD_NE					;vector base + $EC
-ISR_TIM_TC1		EQU	SCI_ISR_BD_NE
-#else
-ISR_TIM_TC1		BGND
-#endif
-#ifdef	SCI_ISR_BD_PE					;vector base + $EE
-ISR_TIM_TC0		EQU	SCI_ISR_BD_PE
-#else
-ISR_TIM_TC0		BGND
-#endif
+ISR_TIM_TC1		EQU	SCI_ISR_BD_NE		;vector base + $EC
+ISR_TIM_TC0		EQU	SCI_ISR_BD_PE		;vector base + $EE
 ISR_RTI			BGND				;vector base + $F0
 ISR_IRQ			BGND				;vector base + $F2
 ISR_XIRQ		BGND				;vector base + $F4
@@ -195,17 +152,13 @@ ISR_SWI			BGND				;vector base + $F6
 ISR_TRAP		BGND				;vector base + $F8
 #else								
 ISR_SPURIOUS		EQU	VECTAB_ISR_ILLIRQ	;vector base + $80
-ISR_PAD			EQU	VECTAB_ISR_ILLIRQ
-#ifdef	VMON_ISR					;vector base + $84
-ISR_ADCCOMP		EQU	VMON_ISR
-#else
-ISR_ADCCOMP		EQU	VECTAB_ISR_ILLIRQ
-#endif
+ISR_PAD			EQU	VECTAB_ISR_ILLIRQ	;vector base + $82
+ISR_ADCCOMP		EQU	VMON_ISR		;vector base + $84
 ISR_RES86		EQU	VECTAB_ISR_ILLIRQ	;vector base + $86
 ISR_API			EQU	VECTAB_ISR_ILLIRQ	;vector base + $88
 ISR_LVI			EQU	VECTAB_ISR_ILLIRQ	;vector base + $8A
 ISR_RES8C		EQU	VECTAB_ISR_ILLIRQ	;vector base + $8C
-ISR_PORTP		EQU	VECTAB_ISR_ILLIRQ
+ISR_PORTP		EQU	VECTAB_ISR_ILLIRQ	;vector base + $8E
 ISR_RES90		EQU	VECTAB_ISR_ILLIRQ	;vector base + $90
 ISR_RES92		EQU	VECTAB_ISR_ILLIRQ	;vector base + $92
 ISR_RES94		EQU	VECTAB_ISR_ILLIRQ	;vector base + $94
@@ -227,17 +180,9 @@ ISR_CANRX		EQU	VECTAB_ISR_ILLIRQ	;vector base + $B2
 ISR_CANERR		EQU	VECTAB_ISR_ILLIRQ	;vector base + $B4
 ISR_CANWUP		EQU	VECTAB_ISR_ILLIRQ	;vector base + $B6
 ISR_FLASH		EQU	VECTAB_ISR_ILLIRQ	;vector base + $B8
-#ifdef	NVM_ISR_ECCERR					;vector base + $BA
-ISR_FLASHFLT  		EQU	NVM_ISR_ECCERR
-#else
-ISR_FLASHFLT  		EQU	VECTAB_ISR_ILLIRQ
-#endif
+ISR_FLASHFLT  		EQU	NVM_ISR_ECCERR		;vector base + $BA
 ISR_SPI2		EQU	VECTAB_ISR_ILLIRQ	;vector base + $BC
-#ifdef	PANEL_ISR_SPI1					;vector base + $BE
-ISR_SPI1		EQU	PANEL_ISR_SPI1
-#else
-ISR_SPI1		EQU	VECTAB_ISR_ILLIRQ
-#endif
+ISR_SPI1		EQU	PANEL_ISR_SPI1		;vector base + $BE
 ISR_RESC0		EQU	VECTAB_ISR_ILLIRQ	;vector base + $C0
 ISR_SCI2		EQU	VECTAB_ISR_ILLIRQ	;vector base + $C2
 ISR_RESC4		EQU	VECTAB_ISR_ILLIRQ	;vector base + $C4
@@ -249,16 +194,8 @@ ISR_PORTJ		EQU	VECTAB_ISR_ILLIRQ	;vector base + $CC
 ISR_RESD0		EQU	VECTAB_ISR_ILLIRQ	;vector base + $D0
 ISR_ATD0		EQU	VECTAB_ISR_ILLIRQ	;vector base + $D2
 ISR_SCI1		EQU	VECTAB_ISR_ILLIRQ	;vector base + $D4
-#ifdef	SCI_ISR_RXTX					;vector base + $D6
-ISR_SCI0		EQU	SCI_ISR_RXTX
-#else
-ISR_SCI0		EQU	VECTAB_ISR_ILLIRQ
-#endif
-#ifdef	PANEL_ISR_SPI0					;vector base + $D8
-ISR_SPI0		EQU	PANEL_ISR_SPI0
-#else
-ISR_SPI0		EQU	VECTAB_ISR_ILLIRQ
-#endif
+ISR_SCI0		EQU	SCI_ISR_RXTX		;vector base + $D6
+ISR_SPI0		EQU	PANEL_ISR_SPI0		;vector base + $D8
 ISR_TIM_PAIE		EQU	VECTAB_ISR_ILLIRQ	;vector base + $DA
 ISR_TIM_PAOV		EQU	VECTAB_ISR_ILLIRQ	;vector base + $DC
 ISR_TIM_TOV		EQU	VECTAB_ISR_ILLIRQ	;vector base + $DE
@@ -266,22 +203,10 @@ ISR_TIM_TC7		EQU	VECTAB_ISR_ILLIRQ	;vector base + $E0
 ISR_TIM_TC6		EQU	VECTAB_ISR_ILLIRQ	;vector base + $E2
 ISR_TIM_TC5		EQU	VECTAB_ISR_ILLIRQ	;vector base + $E4
 ISR_TIM_TC4		EQU	VECTAB_ISR_ILLIRQ	;vector base + $E6
-#ifdef	SCI_ISR_DELAY					;vector base + $E8
-ISR_TIM_TC3		EQU	SCI_ISR_DELAY
-#else
-ISR_TIM_TC3		EQU	VECTAB_ISR_ILLIRQ
-#endif
+ISR_TIM_TC3		EQU	SCI_ISR_DELAY		;vector base + $E8
 ISR_TIM_TC2		EQU	VECTAB_ISR_ILLIRQ	;vector base + $EA
-#ifdef	SCI_ISR_BD_NE					;vector base + $EC
-ISR_TIM_TC1		EQU	SCI_ISR_BD_NE
-#else
-ISR_TIM_TC1		EQU	VECTAB_ISR_ILLIRQ
-#endif
-#ifdef	SCI_ISR_BD_PE					;vector base + $EE
-ISR_TIM_TC0		EQU	SCI_ISR_BD_PE
-#else
-ISR_TIM_TC0		EQU	VECTAB_ISR_ILLIRQ
-#endif
+ISR_TIM_TC1		EQU	SCI_ISR_BD_NE		;vector base + $EC
+ISR_TIM_TC0		EQU	SCI_ISR_BD_PE		;vector base + $EE
 ISR_RTI			EQU	VECTAB_ISR_ILLIRQ	;vector base + $F0
 ISR_IRQ			EQU	VECTAB_ISR_ILLIRQ	;vector base + $F2
 ISR_XIRQ		EQU	VECTAB_ISR_ILLIRQ	;vector base + $F4

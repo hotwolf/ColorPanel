@@ -299,7 +299,7 @@ MAIN_TABS_END_LIN	EQU	@
 #include ./gpio_ColorPanel.s										;I/O setup
 #include ./vectab_ColorPanel.s										;Vector table
 ;#include ../../../Subprojects/S12CForth/Subprojects/S12CBase/Source/S12G-Micro-EVB/base_S12G-Micro-EVB.s;S12CBase bundle
-#include ../../../../S12CBase/Source/S12G-Micro-EVB/base_S12G-Micro-EVB.s;S12CBase bundle
+#include ../../../../S12CBase/Source/S12G-Micro-EVB/base_S12G-Micro-EVB.s				;S12CBase bundle
 	
 
 
