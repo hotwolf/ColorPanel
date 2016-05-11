@@ -1,0 +1,41 @@
+---
+layout: post
+title:  From Squares to Dots
+---
+
+<p>My original plan for this project was to build an animated wall mounted light, which would look like<br />
+this:</p>
+<p style="text-align:center;"><img src="//hotwolf.github.io/ColorPanel/images/ColorPanel_Squares.png" alt="" /></p>
+<p>A 50&#215;50cm<sup>2</sup> panel with 15&#215;15 square pixels which can be lit up in multiple colors. The panel was to<br />
+be build upon an <a href="//www.ikea.com/gb/en/catalog/categories/series/16456"><span class="caps">IKEA</span> <span class="caps">RIBBA</span> picture frame</a><br />
+with a white spray painted glass front that is lit up by WS2812b <span class="caps">LED</span> strips.</p>
+<p style="text-align:center;"><img src="//hotwolf.github.io/ColorPanel/images/RIBBA_Frame.jpeg" alt="" /></p>
+<p>To shape the square pixels, I had planed insert a mesh of cardboard dividers into the inner frame of<br />
+the <span class="caps">RIBBA</span>. This mesh consists of 14 horizontal dividers (50cm by 2.6cm &#8594; the depth of the RIBBA&#8217;s<br />
+inner frame), and 14 vertical dividers (50cm by 2cm), which are a little narrower to leave room for<br />
+the <span class="caps">LED</span> strips.</p>
+<p style="text-align:center;"><img src="//hotwolf.github.io/ColorPanel/images/Cardboard_Stripes.jpeg" alt="" /></p>
+<p>The I used a jigsaw to cut notches in into the inner frame and the dividers, to be able to stick all<br />
+pieces together.</p>
+<p style="text-align:center;"><img src="//hotwolf.github.io/ColorPanel/images/Inner_Frame_Assembly.jpeg" alt="" /></p>
+<p style="text-align:center;"><img src="//hotwolf.github.io/ColorPanel/images/Inner_Frame_Assembly_Detail.jpeg" alt="" /></p>
+<p>Here I made two mistakes:</p>
+<ul>
+	<li>Instead of marking and cutting out all 196 divider notches individually, I bundled the dividers<br />
+  and cut them with a jigsaw. This approach could work in principle, but in my setup the vibration<br />
+  of the saw and the weight of the clamps made the dividers bend while sawing.<br />
+  This caused the notches to be shifted between the various layers of the divider stack.</li>
+	<li>The <span class="caps">LED</span> strips fit exactly the width of the picture frame (50cm).<br />
+  I didn&#8217;t want to cut off the end contacts of the <span class="caps">LED</span> strips, so I cut the inner frame a little<br />
+  narrower at the top and bottom side. This is not a good idea, since this weakens the inner frame.<br />
+  My inner frame broke apart. It is much better to cut the <span class="caps">LED</span> strips a little shorter to make them<br />
+  fit inside the inner frame. The end contacts of the <span class="caps">LED</span> strips are not important. Wires the data<br />
+  signals can be also accessed at the pads of the LEDs</li>
+</ul>
+<p>The frame didn&#8217;t turn out well. The pixels are not really square. I&#8217;m going to toss it.</p>
+<p style="text-align:center;"><img src="//hotwolf.github.io/ColorPanel/images/Inner_Frame_Complete.jpeg" alt="" /></p>
+<p>I don&#8217;t want to build another divider frame, so I&#8217;m going to see how the project looks without one.<br />
+The LEDs have a viewing angle of 120 degrees and they are 3.3cm apart.<br />
+The distance to the glass front is approx. 2.4cm, so the LEDs should produce overlapping dots of<br />
+4.2cm. So the Color panel might look like this in the end:</p>
+<p style="text-align:center;"><img src="//hotwolf.github.io/ColorPanel/images/ColorPanel_Dots.png" alt="" /></p>
